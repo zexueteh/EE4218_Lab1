@@ -49,7 +49,7 @@ module memory_RAM
 		if (enable) begin
 			if (write_en) begin
 					RAM[address] <= write_data_in;
-					 $display("Writing %d to address %d", write_data_in, address);
+					//  $display("Writing %d to address %d", write_data_in, address);
 			end
 			else begin		
 				read_data_out <= RAM[address];

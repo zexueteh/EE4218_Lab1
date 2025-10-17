@@ -86,22 +86,22 @@ module myip_v1_0
 // wires (or regs) to connect to RAMs and matrix_multiply_0 for assignment 1
 // those which are assigned in an always block of myip_v1_0 shoud be changes to reg.
 	reg	A_write_en = 0;								// myip_v1_0 -> A_RAM. To be assigned within myip_v1_0. Possibly reg.
-	wire	[A_depth_bits-1:0] A_write_address;		// myip_v1_0 -> A_RAM. To be assigned within myip_v1_0. Possibly reg. 
+	wire	[$clog2(M*N)-1:0] A_write_address;		// myip_v1_0 -> A_RAM. To be assigned within myip_v1_0. Possibly reg. 
 	wire	[width-1:0] A_write_data_in;			// myip_v1_0 -> A_RAM. To be assigned within myip_v1_0. Possibly reg.
 	wire	A_read_en;								// matrix_multiply_0 -> A_RAM.
-	wire	[A_depth_bits-1:0] A_read_address;		// matrix_multiply_0 -> A_RAM.
+	wire	[$clog2(M*N)-1:0] A_read_address;		// matrix_multiply_0 -> A_RAM.
 	wire	[width-1:0] A_read_data_out;			// A_RAM -> matrix_multiply_0.
 	reg	B_write_en = 0;								// myip_v1_0 -> B_RAM. To be assigned within myip_v1_0. Possibly reg.
-	wire	[B_depth_bits-1:0] B_write_address;		// myip_v1_0 -> B_RAM. To be assigned within myip_v1_0. Possibly reg.
+	wire	[$clog2(N*P)-1:0] B_write_address;		// myip_v1_0 -> B_RAM. To be assigned within myip_v1_0. Possibly reg.
 	wire	[width-1:0] B_write_data_in;			// myip_v1_0 -> B_RAM. To be assigned within myip_v1_0. Possibly reg.
 	wire	B_read_en;								// matrix_multiply_0 -> B_RAM.
-	wire	[B_depth_bits-1:0] B_read_address;		// matrix_multiply_0 -> B_RAM.
+	wire	[$clog2(N*P)-1:0] B_read_address;		// matrix_multiply_0 -> B_RAM.
 	wire	[width-1:0] B_read_data_out;			// B_RAM -> matrix_multiply_0.
 	wire	RES_write_en;							// matrix_multiply_0 -> RES_RAM.
-	wire	[RES_depth_bits-1:0] RES_write_address;	// matrix_multiply_0 -> RES_RAM.
+	wire	[$clog2(M*P)-1:0] RES_write_address;	// matrix_multiply_0 -> RES_RAM.
 	wire	[width-1:0] RES_write_data_in;			// matrix_multiply_0 -> RES_RAM.
 	wire	RES_read_en;  							// myip_v1_0 -> RES_RAM. To be assigned within myip_v1_0. Possibly reg.
-	wire	[RES_depth_bits-1:0] RES_read_address;	// myip_v1_0 -> RES_RAM. To be assigned within myip_v1_0. Possibly reg.
+	wire	[$clog2(M*P)-1:0] RES_read_address;	// myip_v1_0 -> RES_RAM. To be assigned within myip_v1_0. Possibly reg.
 	wire	[width-1:0] RES_read_data_out;			// RES_RAM -> myip_v1_0
 	
 
@@ -112,7 +112,7 @@ module myip_v1_0
 
 
 	// wires (or regs) to connect to matrix_multiply for assignment 1
-	wire	Start; 								// myip_v1_0 -> matrix_multiply_0. To be assigned within myip_v1_0. Possibly reg.
+	reg	Start = 0; 								// myip_v1_0 -> matrix_multiply_0. To be assigned within myip_v1_0. Possibly reg.
 	wire	Done;								// matrix_multiply_0 -> myip_v1_0. 
 			
 				
@@ -171,6 +171,7 @@ module myip_v1_0
 					S_AXIS_TREADY 	<= 0;
 					M_AXIS_TVALID 	<= 0;
 					M_AXIS_TLAST  	<= 0;
+					Start			<= 0;
 					if (S_AXIS_TVALID == 1)
 					begin
 						state       	<= Read_Inputs;
@@ -196,6 +197,8 @@ module myip_v1_0
 							B_write_en	<= 0;
 							state      		<= Compute;
 							S_AXIS_TREADY 	<= 0;
+							Start		<= 1;
+							$display("Starting Computation");
 						end
 						else
 						begin
@@ -206,12 +209,18 @@ module myip_v1_0
             
 				Compute:
 				begin
-					$display("Starting Computation");
 					// Coprocessor function to be implemented (matrix multiply) should be here. Right now, nothing happens here.
-					state		<= Write_Outputs;
+					//state		<= Write_Outputs;
 					// Possible to save a cycle by asserting M_AXIS_TVALID and presenting M_AXIS_TDATA just before going into 
 					// Write_Outputs state. However, need to adjust write_counter limits accordingly
 					// Alternatively, M_AXIS_TVALID and M_AXIS_TDATA can be asserted combinationally to save a cycle.
+					
+					if (Done) begin
+						Start		<= 0;
+						state		<= Write_Outputs;
+						write_counter	<= 0;
+						M_AXIS_TVALID	<= 0; // will be asserted in Write_Outputs state
+					end
 				end
 			
 				Write_Outputs:
@@ -289,9 +298,9 @@ module myip_v1_0
 	matrix_multiply 
 	#(
 		.width(width), 
-		.A_depth_bits(A_depth_bits), 
-		.B_depth_bits(B_depth_bits), 
-		.RES_depth_bits(RES_depth_bits) 
+		.M(M),
+		.N(N),
+		.P(P)
 	) matrix_multiply_0
 	(									
 		.clk(ACLK),
